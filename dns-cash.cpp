@@ -10,7 +10,7 @@ int main()
 {
 	try {
 		ThreadPool threads;
-		threads.initialize_threads(0);
+		threads.initialize_threads(threads.get_optimal_thread_count());
 
 		DNSServer server;
 		DNSRequestCallback callback;
