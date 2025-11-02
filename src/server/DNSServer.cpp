@@ -7,8 +7,12 @@
 #include <iostream>
 #include <ws2tcpip.h>
 
+DNSServer::DNSServer(unsigned short port, ICallback& callback) : dns_port(port) {
+	this->start(dns_port);
+	this->listen(callback);
+}
+
 bool DNSServer::start(unsigned short port) {
-	this->dnsPort = port;
 	try {
 		//im not sure why i decided to init WSA calls in another fucntion but it just looks good.
 		if (!start_internal()) throw std::exception("WSA Error");
@@ -21,14 +25,14 @@ bool DNSServer::start(unsigned short port) {
 			return false;
 		}
 
-		sockaddr_in currentAddr{};
-		currentAddr.sin_family = AF_INET;
-		currentAddr.sin_port = htons(this->dnsPort); //converts the value from the host's to network short byte order (big endian)
+		sockaddr_in current_addr{};
+		current_addr.sin_family = AF_INET;
+		current_addr.sin_port = htons(this->dns_port); //converts the value from the host's to network short byte order (big endian)
 
-		inet_pton(AF_INET, "0.0.0.0", &currentAddr.sin_addr); //Converts IP string into a binary format for sockaddr_in.
+		inet_pton(AF_INET, "0.0.0.0", &current_addr.sin_addr); //Converts IP string into a binary format for sockaddr_in.
 
-		if (bind(socket_, reinterpret_cast<sockaddr*>(&currentAddr), sizeof(currentAddr)) == SOCKET_ERROR) {
-			std::cerr << "bind() failed on port (" << this->dnsPort << ") - " << WSAGetLastError() << std::endl;
+		if (bind(socket_, reinterpret_cast<sockaddr*>(&current_addr), sizeof(current_addr)) == SOCKET_ERROR) {
+			std::cerr << "bind() failed on port (" << this->dns_port << ") - " << WSAGetLastError() << std::endl;
 			closesocket(socket_);
 			WSACleanup();
 			return false;
@@ -45,15 +49,15 @@ bool DNSServer::start(unsigned short port) {
 
 void DNSServer::listen(ICallback& callback) const {
 	if (runsock_) {
-		std::cout << DNSServer::art << " on -> port : " << this->dnsPort << std::endl;
-		sockaddr_in fromAddr;
-		int clientAddrLen = sizeof(fromAddr);
+		std::cout << DNSServer::art << " on -> port : " << this->dns_port << std::endl;
+		sockaddr_in from_addr;
+		int from_addr_len = sizeof(from_addr);
 
 		char buffer[512]; // RFC 1035
 
 		while (runsock_) {
-			int recvLen = recvfrom(socket_, buffer, 512, 0, (SOCKADDR*)&fromAddr, &clientAddrLen);
-			if (recvLen) callback.onReceive(buffer, recvLen, fromAddr);
+			int recvLen = recvfrom(socket_, buffer, 512, 0, (SOCKADDR*)&from_addr, &from_addr_len);
+			if (recvLen) callback.onReceive(buffer, recvLen, from_addr);
 		}
 	}
 	else throw std::system_error(213, std::generic_category(), std::string("DNS Server Is Not Initialized"));

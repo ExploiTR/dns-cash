@@ -5,11 +5,6 @@
 
 class DNSServer {
 private:
-	unsigned short dnsPort = 53;
-	SOCKET socket_ = INVALID_SOCKET;
-	bool runsock_ = false;
-	bool start_internal();
-
 	const char* art = R"(
  /$$$$$$$  /$$   /$$  /$$$$$$           /$$$$$$   /$$$$$$   /$$$$$$  /$$   /$$
 | $$__  $$| $$$ | $$ /$$__  $$         /$$__  $$ /$$__  $$ /$$__  $$| $$  | $$
@@ -22,11 +17,18 @@ private:
 ------------------------------------------------------------------------------
 Running ~)";
 
-public:
-	DNSServer() = default;
-	~DNSServer() { stop(); }
+	unsigned short dns_port = 53;
+	SOCKET socket_ = INVALID_SOCKET;
+	bool runsock_ = false;
+
+	DNSServer();
+	bool start_internal();
 	bool start(unsigned short port = 53);
 	void listen(ICallback& callback) const;
+
+public:
+	DNSServer(unsigned short port, ICallback& callback);
+	~DNSServer() { stop(); }
 	bool stop();
 	void send();
 };
