@@ -5,17 +5,19 @@
 #include "callback/DNSRequestCallback.h" 
 #include "server/DNSServer.h"     
 #include "executors/ThreadPool.h"
+#include <random>
+#include <thread>
+#include <chrono>
 
 int main()
 {
-	try {
-		ThreadPool threads;
-		threads.initialize_threads(0);
 
-		DNSServer server;
-		DNSRequestCallback callback;
-		server.start(6073);
-		server.listen(callback);
+	try {
+		ThreadPool threads(ThreadPool::get_optimal_thread_count());
+
+		//DNSRequestCallback callback;
+		//DNSServer server(6073, callback);
+
 		return 0;
 	}
 	catch (std::exception& ex) {
