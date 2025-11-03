@@ -2,11 +2,10 @@
 #include <iostream>
 
 //initalize our pool and set stop code to false
-ThreadPool::ThreadPool(int thread_count) : stop_code(false) {
+ThreadPool::ThreadPool(int thread_count) : stop_code(false), active_thread_count(thread_count) {
 	if (thread_count < 1) throw std::exception("Invalid thread count!");
 
-	this->active_thread_count = thread_count;
-	this->initialize_workers(thread_count);
+	this->initialize_workers(this->active_thread_count);
 }
 
 unsigned int ThreadPool::get_optimal_thread_count(int logical_threads_per_core) {
@@ -20,40 +19,45 @@ void ThreadPool::initialize_workers(int thread_count) {
 	if (thread_count < 1) throw std::exception("Invalid thread count!");
 	std::cout << "Initializing with worker count - " << thread_count << std::endl;
 
-	this->active_thread_count = thread_count;
 	for (int _ = 0; _ < thread_count; _++) {
 		// although its one time activity we avoid an extra move
-		this->workers.emplace_back([this]
-			{
-				//loop until asked to stop
-				while (!stop_code) {
-					//lock guard cant auto unlock so we need a RAII lock that supports manual unlock/relock
-					std::unique_lock<std::mutex> lock(qutex);
+		this->workers.emplace_back(this->get_worker_thread());
+	}
+}
 
-					//this thread will now wait until tasks are available or stop code is triggered.
-					cvar.wait(lock, [this] { return !tasks.empty() || stop_code; });
+std::thread ThreadPool::get_worker_thread() {
+	return std::thread([this]
+		{
+			//loop until asked to stop
+			while (!this->stop_code) {
+				//lock guard cant auto unlock so we need a RAII lock that supports manual unlock/relock
+				std::unique_lock<std::mutex> lock(this->qutex);
 
-					//incase here for stop code.
-					if (!tasks.empty()) {
-						//get the task and remove from queue
-						const std::function<void()> task = std::move(tasks.front()); //actual copy with move semantics
-						tasks.pop();
+				//this thread will now wait until tasks are available or stop code is triggered.
+				//Atomic: unlock, sleep, reacquire lock, check predicate. Prevents false wakeups.
+				this->cvar.wait(lock, [this] { return !this->tasks.empty() || this->stop_code; });
 
-						//we can unlock now before executing
-						lock.unlock();
+				//incase here for stop code.
+				if (!this->tasks.empty()) {
+					//get the task and remove from queue
+					const std::function<void()> task = std::move(this->tasks.front()); //actual copy with move semantics
+					this->tasks.pop();
 
-						try {
-							//running the actual task.
-							task();
-						}
-						catch (std::exception& ex) {
-							std::cout << "Error in worker thread - " << ex.what() << std::endl;
-						}
+					//we can unlock now before executing
+					lock.unlock();
+
+					try {
+						//running the actual task.
+						task();
+					}
+					catch (std::exception& ex) {
+						std::cout << "Error in worker thread - " << ex.what() << std::endl;
 					}
 				}
+
+				// Lock auto-unlocks here when it goes out of scope (if still locked)
 			}
-		);
-	}
+		});
 }
 
 void ThreadPool::enqueue_task(const std::function<void()>& task) {

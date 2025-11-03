@@ -15,8 +15,10 @@ int main()
 	try {
 		ThreadPool threads(ThreadPool::get_optimal_thread_count());
 
-		//DNSRequestCallback callback;
-		//DNSServer server(6073, callback);
+		DNSServer server(6073);
+		DNSRequestCallback callback(threads,server);
+
+		server.listen(callback);
 
 		return 0;
 	}

@@ -6,10 +6,10 @@
 #include <exception>
 #include <iostream>
 #include <ws2tcpip.h>
+#include <mutex>
 
-DNSServer::DNSServer(unsigned short port, ICallback& callback) : dns_port(port) {
+DNSServer::DNSServer(unsigned short port) : dns_port(port) {
 	this->start(dns_port);
-	this->listen(callback);
 }
 
 bool DNSServer::start(unsigned short port) {
@@ -47,8 +47,9 @@ bool DNSServer::start(unsigned short port) {
 	}
 }
 
-void DNSServer::listen(ICallback& callback) const {
+void DNSServer::listen(ICallback& callback) {
 	if (runsock_) {
+		this->listen_ = true;
 		std::cout << DNSServer::art << " on -> port : " << this->dns_port << std::endl;
 		sockaddr_in from_addr;
 		int from_addr_len = sizeof(from_addr);
@@ -63,15 +64,11 @@ void DNSServer::listen(ICallback& callback) const {
 	else throw std::system_error(213, std::generic_category(), std::string("DNS Server Is Not Initialized"));
 }
 
-void DNSServer::send() {
-	//sockaddr_in add;
-	//add.sin_family = AF_INET;
-	//add.sin_addr.s_addr = inet_addr(address.c_str());
-	//add.sin_port = htons(port);
-	//int ret = sendto(sock, buffer, len, 0, (SOCKADDR*)&add, sizeof(add));
-	//if (ret < 0)
-	//	throw std::system_error(WSAGetLastError(), std::system_category(), "sendto failed");
-
+void DNSServer::send(sockaddr_in& to_addr, const char* resp, int resp_len) {
+	std::lock_guard<std::mutex> lock(this->send_mutex);
+	int ret = sendto(this->socket_, resp, resp_len, 0, (SOCKADDR*)&to_addr, sizeof(to_addr));
+	if (ret < 0)
+		throw std::system_error(WSAGetLastError(), std::system_category(), "Error : DNS Server sendto failed!");
 }
 
 //init windows socket api/wsa 
@@ -88,7 +85,8 @@ bool DNSServer::start_internal() {
 bool DNSServer::stop() {
 	try {
 		if (socket_ != INVALID_SOCKET) closesocket(socket_);
-		runsock_ = false;
+		this->listen_ = false;
+		this->runsock_ = false;
 		WSACleanup();
 		return true;
 	}

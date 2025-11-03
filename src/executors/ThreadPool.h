@@ -19,6 +19,8 @@ private:
 	std::condition_variable cvar; //our beloved war horn
 	std::atomic<bool> stop_code{ false };
 
+	std::thread get_worker_thread();
+
 	ThreadPool();
 
 public:
@@ -31,4 +33,5 @@ public:
 	void stop_workers();
 
 	void enqueue_task(const std::function<void()>& task);
+	
 };
