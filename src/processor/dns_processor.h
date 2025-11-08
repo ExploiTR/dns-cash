@@ -70,3 +70,5 @@ struct DNSQuestion {
 	uint16_t qtype;
 	uint16_t qclass;
 };
+
+void parse_query(const char* query, int qlen, DNSHeader& header, DNSQuestion& question);

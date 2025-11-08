@@ -3,10 +3,30 @@
 #include <WinSock2.h>
 
 
-void extract(const char* msg, int len) {
-	if (len < 12)
+/*
+* This fucntion will run in a thread to parse_query DNS Query information from the message itself.
+* 
+*	4.1. Format
+*	
+*	All communications inside of the domain protocol are carried in a single
+*	format called a message.  The top level format of message is divided
+*	into 5 sections (some of which are empty in certain cases) shown below:
+*	
+*		+---------------------+
+*		|        Header       |
+*		+---------------------+
+*		|       Question      | the question for the name server
+*		+---------------------+
+*		|        Answer       | RRs answering the question
+*		+---------------------+
+*		|      Authority      | RRs pointing toward an authority
+*		+---------------------+
+*		|      Additional     | RRs holding additional information
+*		+---------------------+
+*/
+void parse_query(const char* query, int qlen, DNSHeader& header, DNSQuestion& question) {
+	if (qlen < 12)
 		throw std::exception("Error: Message too short for DNS header");
-
 
 	/*
 	* RFC 1035 - 4.1.1 - Header section format
@@ -34,14 +54,12 @@ void extract(const char* msg, int len) {
 	* Bytes 10-11: ARCOUNT (16 bits)
 	*/
 
-	DNSHeader header;
-
-	//read 16bit(2 bytes) starting from msg[0]'s address then 
+	//read 16bit(2 bytes) starting from query[0]'s address then 
 	//dereference to get the value and use ntohs to convert network to host order.
 	//header is pretty much straightforward
-	header.id = ntohs((*(uint16_t*)&msg[0]));
+	header.id = ntohs((*(uint16_t*)&query[0]));
 
-	uint16_t flags = ntohs(*(uint16_t*)&msg[2]);
+	uint16_t flags = ntohs(*(uint16_t*)&query[2]);
 	header.qr = flags >> 15;
 	header.opcode = flags >> 11 & 0b1111;
 	header.aa = flags >> 10 & 0b1;
@@ -51,10 +69,10 @@ void extract(const char* msg, int len) {
 	header.z = flags >> 4 & 0b111;
 	header.rcode = flags & 0b1111;
 
-	header.qdcount = ntohs(*(uint16_t*)&msg[4]);
-	header.ancount = ntohs(*(uint16_t*)&msg[6]);
-	header.nscount = ntohs(*(uint16_t*)&msg[8]);
-	header.arcount = ntohs(*(uint16_t*)&msg[10]);
+	header.qdcount = ntohs(*(uint16_t*)&query[4]);
+	header.ancount = ntohs(*(uint16_t*)&query[6]);
+	header.nscount = ntohs(*(uint16_t*)&query[8]);
+	header.arcount = ntohs(*(uint16_t*)&query[10]);
 
 	/*
 	* For example, a datagram might need to use the domain names F.ISI.ARPA,
@@ -114,30 +132,32 @@ void extract(const char* msg, int len) {
 	*	+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
 	*/
 
-	DNSQuestion question;
-	uint_fast8_t qaddr = 12;
+	//DNS messages can never exceed 65,535 bytes due to the 2-byte length field in TCP
+	uint_fast16_t qaddr = 12;
 
+	//is this efficient enough? need profiling
 	std::string buffer;
-	//should I use a unordered_map or a index-array for message-compression storage?
 
-	while (*(uint8_t*)&msg[qaddr] != 0) {
-		uint8_t len = *(uint8_t*)&msg[qaddr];
+	// TODO : message compression decoding
+	// should I use a unordered_map or a index-array for message-compression storage?
 
-		buffer.append(&msg[qaddr + 1], len)
+	while (*(uint8_t*)&query[qaddr] != 0) {
+		uint8_t len = *(uint8_t*)&query[qaddr];
+
+		buffer.append(&query[qaddr + 1], len)
 			.append(".");
 
 		qaddr += len + 1;
 	}
 
+	buffer.pop_back();
+
 	question.qname = std::move(buffer);
 	qaddr++; //move to next start
 
-	question.qtype = (*(uint16_t*)&msg[qaddr]);
-	qaddr++;
+	question.qtype = ntohs(*(uint16_t*)&query[qaddr]);
+	qaddr += 2;
 
-	question.qclass = (*(uint16_t*)&msg[qaddr]);
-	qaddr++;
-
-
-	//question.qname
+	question.qclass = ntohs(*(uint16_t*)&query[qaddr]);
+	qaddr += 2;
 }
