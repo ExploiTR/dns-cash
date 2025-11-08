@@ -1,5 +1,7 @@
 #pragma once
 #include <stdint.h>
+#include <string>
+
 /*
 RFC 1035 - 4.1.1 - Header Section format
 -----------------------------------------
@@ -52,7 +54,19 @@ RFC 1035 - 4.1.2 - Question Section format
 */
 
 struct DNSQuestion {
-	uint16_t qname;
+	/*
+	* QNAME     a domain name represented as a sequence of labels, where
+                each label consists of a length octet followed by that
+                number of octets.  The domain name terminates with the
+                zero length octet for the null label of the root.  Note
+                that this field may be an odd number of octets; no
+                padding is used.
+	*/
+
+	//I'm not sure if using raw pointers will give
+	//me any real gain here considering small string optimization
+	//and domain name sizes so I'll keep it to string
+	std::string qname;
 	uint16_t qtype;
 	uint16_t qclass;
 };
