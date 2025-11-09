@@ -8,18 +8,21 @@
 #include <random>
 #include <thread>
 #include <chrono>
+#include <utils/cmdl_honly.h>
 
-int main()
+int main(int argc, char* argv[])
 {
 	std::ios::sync_with_stdio(false);
 	std::cin.tie(nullptr);
 	std::cout.tie(nullptr);
 
 	try {
-		ThreadPool threads(ThreadPool::get_optimal_thread_count());
+		dns_cash::CMDLineParser parser(argc, argv);
+
+		ThreadPool threads(ThreadPool::get_optimal_thread_count(2), true);
 
 		DNSServer server(6073);
-		DNSRequestCallback callback(threads,server);
+		DNSRequestCallback callback(threads, server);
 
 		server.listen(callback);
 
