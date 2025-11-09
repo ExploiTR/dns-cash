@@ -1,4 +1,6 @@
 #pragma once
 #include <string>
+#include "utils/tlru_cache.h"
+#include "dns_parser.h"
 
-void process_domain_info(const std::string& domain_name);
+void process_domain_info(DNSQuestion dns_query, dns_cash::TLRUCache cache_map);

@@ -57,11 +57,11 @@ RFC 1035 - 4.1.2 - Question Section format
 struct DNSQuestion {
 	/*
 	* QNAME     a domain name represented as a sequence of labels, where
-                each label consists of a length octet followed by that
-                number of octets.  The domain name terminates with the
-                zero length octet for the null label of the root.  Note
-                that this field may be an odd number of octets; no
-                padding is used.
+				each label consists of a length octet followed by that
+				number of octets.  The domain name terminates with the
+				zero length octet for the null label of the root.  Note
+				that this field may be an odd number of octets; no
+				padding is used.
 	*/
 
 	//I'm not sure if using raw pointers will give
@@ -70,12 +70,19 @@ struct DNSQuestion {
 	std::string qname;
 	uint16_t qtype;
 	uint16_t qclass;
+
+	//Operator overload for using it in Cache key
+	bool operator==(const DNSQuestion& other) const {
+		return qname == other.qname &&
+			qtype == other.qtype &&
+			qclass == other.qclass;
+	}
 };
 
-struct DNSRequest {
-	DNSHeader header;
-	DNSQuestion question;
+struct DNSAnswer {
+
 };
+
 
 /*
 * This function will run in a thread to parse DNS Query information from the message itself.
@@ -106,3 +113,30 @@ struct DNSRequest {
 *		+---------------------+
 */
 bool parse_dns_query(const char* query, int qlen, DNSHeader& header, DNSQuestion& question);
+
+/*
+	For maps to work, we need a custom hash function for the key type.
+	which has to be provided or otherwise, we'd get a similar error like mentioned below
+
+	'std::hash<DNSQuestion>::hash(void)': attempting to reference a deleted function
+*/
+namespace std {
+	template<>
+	struct hash<DNSQuestion> {
+		size_t operator()(const DNSQuestion& question) const {
+			size_t seed = 0;
+
+			auto hash_combine = [](size_t& seed, const size_t& value)
+				{
+					// 0x9e3779b97f4a7c15 -> 2^64 divided by golden ratio 1.618
+					seed ^= value + 0x9e3779b97f4a7c15 + (seed << 6) + (seed >> 2);
+				};
+
+			hash_combine(seed, hash<string>()(question.qname));
+			hash_combine(seed, hash<uint16_t>()(question.qtype));
+			hash_combine(seed, hash<uint16_t>()(question.qclass));
+
+			return seed;
+		}
+	};
+}
