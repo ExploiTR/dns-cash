@@ -18,6 +18,7 @@ namespace dns_cash {
 		bool enable_affinity = false;
 		unsigned int target_tcount = 8;
 		unsigned int system_ltpc = 0;
+		bool user_entered_any_arg = false;
 
 		static bool match_user_arg(const std::string& arg, const std::initializer_list<std::string>& names) {
 			for (const auto& n : names) {
@@ -29,6 +30,8 @@ namespace dns_cash {
 
 	public:
 		CMDLineParser(int argc, char* argv[]) {
+			this->user_entered_any_arg = argc > 1;
+
 			try {
 				for (int i = 1; i < argc; ++i) {
 					std::string arg = argv[i];
@@ -103,6 +106,7 @@ namespace dns_cash {
 		unsigned int get_user_req_tcount() const { return target_tcount; }
 		unsigned int get_user_provided_ltpc() const { return system_ltpc; }
 		bool should_enable_affinity() const { return enable_affinity; }
+		bool should_enable_commands() const { return user_entered_any_arg; }
 
 		void print_help_message() const {
 			std::cout << R"(
@@ -144,4 +148,4 @@ Examples:
 		}
 	};
 
-} 
+}
