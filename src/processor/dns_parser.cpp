@@ -31,6 +31,12 @@
 *		+---------------------+
 *		|      Additional     | RRs holding additional information
 *		+---------------------+
+*
+* @note : Important Consideration
+*
+* Anti-Patters : https://www.rfc-editor.org/rfc/rfc9267.txt
+* Original 1035 : https://datatracker.ietf.org/doc/html/rfc1035
+*
 */
 bool parse_dns_query(const char* query, int qlen, DNSHeader& header, DNSQuestion& question) {
 	if (qlen < 12) {
@@ -124,7 +130,7 @@ bool parse_dns_query(const char* query, int qlen, DNSHeader& header, DNSQuestion
 	* concatenate a label for FOO to the previously defined F.ISI.ARPA.  The
 	* domain name ARPA is defined at offset 64 using a pointer to the ARPA
 	* component of the name F.ISI.ARPA at 20; note that this pointer relies on
-	* ARPA being the last label in the string at 20.  The root domain name is
+	* ARPA being the last label in the string at 20.
 	*
 	* =======================================================================
 	* RFC 1035 -  4.1.2. Question section format
@@ -146,30 +152,71 @@ bool parse_dns_query(const char* query, int qlen, DNSHeader& header, DNSQuestion
 	uint_fast16_t qaddr = 12;
 
 	//is this efficient enough? need profiling
-	std::string buffer;
+	auto& buffer = question.qname;
+	uint_fast16_t buffer_pos = 0;
 
-	// TODO : message compression decoding
-	// should I use a unordered_map or a index-array for message-compression storage?
+	if (!parse_dnsq_internal_w_cmpr(query, qaddr, buffer, buffer_pos, 0)) return false;
 
-	while (*(uint8_t*)&query[qaddr] != 0) {
-		uint8_t len = *(uint8_t*)&query[qaddr];
+	buffer[buffer_pos] = '\0';
 
-		buffer.append(&query[qaddr + 1], len)
-			.append(".");
-
-		qaddr += len + 1;
-	}
-
-	buffer.pop_back();
-
-	question.qname = std::move(buffer);
-	qaddr++; //move to next start
+	if (qaddr + 4 > qlen) return false;  // Need 4 bytes for QTYPE+QCLASS
 
 	question.qtype = ntohs(*(uint16_t*)&query[qaddr]);
 	qaddr += 2;
 
 	question.qclass = ntohs(*(uint16_t*)&query[qaddr]);
 	qaddr += 2;
+
+	return true;
+}
+
+bool parse_dnsq_internal_w_cmpr(const char* query, uint_fast16_t& qaddr, char* sink_buf, uint_fast16_t& bufaddr, uint_fast8_t jump_count)
+{
+	// RFC 9267: Prevent compression pointer loops
+	if (jump_count > 5) return false;
+
+	while (*(uint8_t*)&query[qaddr] != 0) {
+		//read length from the first byte at the index
+		uint8_t len = *(uint8_t*)&query[qaddr];
+
+		// Validate label length (max 63 per 4.1.4. Message compression - RFC 1035)
+		if (len > 63 || bufaddr + len + 1 >= 255)
+			return false;
+
+		// message compression handling - 4.1.4 
+		// compression pointer check first 2 as 1
+		if ((len & 0b11000000) == 0b11000000) {
+			//take rest except first 2 in the 16bit
+			uint_fast16_t cmpr_offset = 0b0011111111111111 & ntohs(*(uint16_t*)&query[qaddr]);
+
+			//offset should not excced qaddr
+			if (cmpr_offset >= qaddr) return false;
+
+			bool res = parse_dnsq_internal_w_cmpr(query, cmpr_offset, sink_buf, bufaddr, jump_count + 1);
+			if (!res) return false;
+
+			//skip to the next line (next to next byte)
+			qaddr += 2;
+
+			//a sequence of labels ending with a pointer
+			return true;
+		}
+
+		// Copy label, write to the sink index from next byte of query skipping the length specififer byte
+		memcpy(&sink_buf[bufaddr], &query[qaddr + 1], len);
+
+		//update sink index with length
+		bufaddr += len;
+
+		//skip to the next byte
+		qaddr += len + 1;
+
+		// Add dot only if next byte not zero
+		if (*(uint8_t*)&query[qaddr] != 0)
+			sink_buf[bufaddr++] = '.';
+	}
+
+	qaddr++; //move to next start
 
 	return true;
 }

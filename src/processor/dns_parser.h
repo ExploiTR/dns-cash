@@ -64,16 +64,15 @@ struct DNSQuestion {
 				padding is used.
 	*/
 
-	//I'm not sure if using raw pointers will give
-	//me any real gain here considering small string optimization
-	//and domain name sizes so I'll keep it to string
-	std::string qname;
+	//I'm avoiding runtime re-alloc at the cost of stack
+	//not sure if this was a de-optimization
+	char qname[256];
 	uint16_t qtype;
 	uint16_t qclass;
 
 	//Operator overload for using it in Cache key
 	bool operator==(const DNSQuestion& other) const {
-		return qname == other.qname &&
+		return memcmp(qname, other.qname, 256) == 0 &&
 			qtype == other.qtype &&
 			qclass == other.qclass;
 	}
@@ -113,6 +112,36 @@ struct DNSAnswer {
 *		+---------------------+
 */
 bool parse_dns_query(const char* query, int qlen, DNSHeader& header, DNSQuestion& question);
+
+
+/*
+* This function will read from input query, until a zero is found (end of name/data) and append to the buffer.
+* Handles '.' addition and null-termination. See below note for details.
+*
+* @param query The input Query
+* @param start_qry_idx Where to start reading in the query (!! PBR)
+* @param sink_buf Where to write the read query
+* @param start_sink_idx Where in the buffer to write the read query (!! PBR)
+* @param jump_count For message compression, we need to track jumps for RFC 9267
+*
+* @returns bool If process is successful.
+*
+* @note
+* 	   +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
+* 	20 |           1           |           F           |
+* 	   +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
+* 	22 |           3           |           I           |
+* 	   +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
+* 	24 |           S           |           I           |
+* 	   +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
+* 	26 |           4           |           A           |
+* 	   +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
+* 	28 |           R           |           P           |
+* 	   +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
+* 	30 |           A           |           0           |
+* 	   +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
+*/
+bool parse_dnsq_internal_w_cmpr(const char* query, uint_fast16_t& start_qry_idx, char* sink_buf, uint_fast16_t& start_sink_idx, uint_fast8_t jump_count = 0);
 
 /*
 	For maps to work, we need a custom hash function for the key type.

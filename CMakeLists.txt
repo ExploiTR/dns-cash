@@ -16,6 +16,11 @@ add_executable (dns-cash "dns-cash.cpp" "dns-cash.h" "src/server/DNSServer.cpp" 
 target_include_directories(dns-cash PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/src)
 target_link_libraries(dns-cash PRIVATE ws2_32)
 
+# Increase MSVC stack size to 16 MB
+if (MSVC)
+    target_link_options(dns-cash PRIVATE "/STACK:16777216")
+endif()
+
 if (CMAKE_VERSION VERSION_GREATER 3.12)
   set_property(TARGET dns-cash PROPERTY CXX_STANDARD 20)
 endif()
