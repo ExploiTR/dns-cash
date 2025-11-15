@@ -14,6 +14,8 @@ void dns_cash::TLRUCache::add(const DNSQuestion& question)
 {
 	if (this->current_size_ > this->max_capacity_hard_limit_) {
 		//perform cleanup
+		this->cache_map_mutex.lock();
+	//todo	this->query_cache_map.clear;
 	}
 
 
