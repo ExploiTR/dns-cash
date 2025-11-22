@@ -5,7 +5,6 @@
 #include "DNSServer.h"
 #include <exception>
 #include <iostream>
-#include <ws2tcpip.h>
 #include <mutex>
 
 DNSServer::DNSServer(unsigned short port) : dns_port(port) {
@@ -48,28 +47,37 @@ bool DNSServer::start(unsigned short port) {
 }
 
 void DNSServer::listen(ICallback& callback) {
-	if (runsock_) {
-		this->listen_ = true;
-		std::cout << DNSServer::art << " on -> port : " << this->dns_port << std::endl;
-		sockaddr_in from_addr;
-		int from_addr_len = sizeof(from_addr);
+	if (!runsock_) throw std::system_error(213, std::generic_category(), "DNS Server Is Not Initialized");
 
-		char buffer[512]; // RFC 1035
+	this->listen_ = true;
+	std::cout << DNSServer::art << " on -> port : " << this->dns_port << std::endl;
+	sockaddr_in from_addr;
+	int from_addr_len = sizeof(from_addr);
 
-		while (runsock_) {
-			int recvLen = recvfrom(socket_, buffer, 512, 0, (SOCKADDR*)&from_addr, &from_addr_len);
-			if (recvLen) callback.onReceive(buffer, recvLen, from_addr);
-		}
+	char buffer[4096]; // RFC 1035 is 512, but I dont wanna drop packets.
+
+	while (runsock_) {
+		int recvLen = recvfrom(socket_, buffer, 4096, 0, (SOCKADDR*)&from_addr, &from_addr_len);
+		if (recvLen > 0) callback.onReceive(buffer, recvLen, from_addr);
 	}
-	else throw std::system_error(213, std::generic_category(), std::string("DNS Server Is Not Initialized"));
 }
 
 void DNSServer::send(sockaddr_in& to_addr, const char* resp, int resp_len) {
-	std::lock_guard<std::mutex> lock(this->send_mutex);
+	// sendto is thread-safe for UDP.
 	int ret = sendto(this->socket_, resp, resp_len, 0, (SOCKADDR*)&to_addr, sizeof(to_addr));
-	if (ret < 0)
-		throw std::system_error(WSAGetLastError(), std::system_category(), "Error : DNS Server sendto failed!");
+
+	if (ret < 0) {
+		// NO THROW.
+		// UDP is unreliable by design. If a packet drops, the client will retry.
+		// Just log the error and move on.
+
+		int err = WSAGetLastError();
+		if (err != WSAEWOULDBLOCK && err != WSAEINTR) {
+			//need 2 log
+		}
+	}
 }
+
 
 //init windows socket api/wsa 
 bool DNSServer::start_internal() {

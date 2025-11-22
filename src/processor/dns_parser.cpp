@@ -192,6 +192,7 @@ bool parse_dnsq_internal_w_cmpr(const char* query, uint_fast16_t& qaddr, char* s
 			//offset should not excced qaddr
 			if (cmpr_offset >= qaddr) return false;
 
+			//parse compression
 			bool res = parse_dnsq_internal_w_cmpr(query, cmpr_offset, sink_buf, bufaddr, jump_count + 1);
 			if (!res) return false;
 

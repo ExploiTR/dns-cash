@@ -78,8 +78,42 @@ struct DNSQuestion {
 	}
 };
 
-struct DNSAnswer {
 
+/*
+@note RFC 1035 - 4.1.3
+
+  0  1  2  3  4  5  6  7  8  9 10 11 12 13 14 15
++--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
+|                                               |
+/                                               /
+/                      NAME                     /
+|                                               |
++--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
+|                      TYPE                     |
++--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
+|                     CLASS                     |
++--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
+|                      TTL                      |
+|                                               |
++--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
+|                   RDLENGTH                    |
++--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
+/                     RDATA                     /
+/                                               /
++--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
+
+
+@remarks
+--> We don't necessarily need 'name', 'type', 'class' here if they are already in the Key.
+*/
+
+struct DNSAnswer {
+	uint64_t expiry; // need to read ttl then add to UTC (steady clock)
+	uint16_t rdlen;
+
+	//For a modern server (even a laptop), wasting 500MB to save 
+	//millions of malloc/free calls and gain raw speed is a fantastic trade-off.
+	uint8_t rdata[512];
 };
 
 
