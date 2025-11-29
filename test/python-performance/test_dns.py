@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 """
-Fast DNS Performance Test Script
-Tests DNS server response times and reliability
+High-Performance DNS Load Test with Real-Time Progress
 """
 
 import sys
@@ -9,90 +8,100 @@ import subprocess
 
 # Auto-install dependencies
 try:
-    import dns.resolver
+    import dns.asyncresolver
+    from tqdm.asyncio import tqdm_asyncio
 except ImportError:
-    print("Installing dnspython...")
-    subprocess.check_call([sys.executable, "-m", "pip", "install", "-q", "dnspython"])
-    import dns.resolver
+    print("Installing dependencies...")
+    subprocess.check_call([sys.executable, "-m", "pip", "install", "-q", "dnspython", "tqdm"])
+    import dns.asyncresolver
+    from tqdm.asyncio import tqdm_asyncio
 
+import asyncio
 import time
-import statistics
+from collections import Counter
 
 
-def dns_performance_test(host="127.0.0.1", port=6073, domain="google.com", queries=10):
-    """
-    Test DNS server performance
+async def query_dns(resolver, domain, stats):
+    """Single DNS query"""
+    try:
+        await resolver.resolve(domain, "A")
+        stats["success"] += 1
+    except dns.asyncresolver.NoAnswer:
+        stats["no_answer"] += 1
+    except dns.asyncresolver.NXDOMAIN:
+        stats["nxdomain"] += 1
+    except dns.exception.Timeout:
+        stats["timeout"] += 1
+    except Exception:
+        stats["error"] += 1
+
+
+async def run_load_test(
+    host="127.0.0.1",
+    port=6073,
+    domain="google.com",
+    total_queries=10000,
+    concurrency=1000,
+):
+    """DNS load test with progress bar"""
+    print(f"DNS Load Test")
+    print(f"=" * 50)
+    print(f"Target:      {host}:{port}")
+    print(f"Domain:      {domain}")
+    print(f"Queries:     {total_queries:,}")
+    print(f"Concurrency: {concurrency}")
+    print(f"=" * 50)
+    print()
     
-    Args:
-        host: DNS server IP address
-        port: DNS server port
-        domain: Domain to query
-        queries: Number of queries to perform
-    """
     # Configure resolver
-    resolver = dns.resolver.Resolver(configure=False)
+    resolver = dns.asyncresolver.Resolver(configure=False)
     resolver.nameservers = [host]
     resolver.port = port
-    resolver.timeout = 2
-    resolver.lifetime = 2
-
-    times = []
-    failures = 0
-
-    print(f"Testing DNS server at {host}:{port}")
-    print(f"Query: {domain}")
-    print(f"Total queries: {queries}\n")
-
-    # Perform queries
-    for i in range(1, queries + 1):
-        start = time.perf_counter()
-        try:
-            answer = resolver.resolve(domain, "A")
-            elapsed = (time.perf_counter() - start) * 1000
-            times.append(elapsed)
-            print(f"[{i}] SUCCESS {elapsed:.2f} ms | IP: {answer[0]}")
-        except dns.exception.Timeout:
-            failures += 1
-            print(f"[{i}] FAILED (timeout)")
-        except dns.resolver.NXDOMAIN:
-            failures += 1
-            print(f"[{i}] FAILED (domain not found)")
-        except dns.resolver.NoAnswer:
-            failures += 1
-            print(f"[{i}] FAILED (no answer)")
-        except Exception as e:
-            failures += 1
-            print(f"[{i}] FAILED ({type(e).__name__}: {str(e)})")
-
-    # Print results
-    print("\n" + "=" * 40)
-    print("RESULTS")
-    print("=" * 40)
+    resolver.timeout = 5.0
+    resolver.lifetime = 5.0
     
-    success = len(times)
-    total = success + failures
-    success_rate = (success / total * 100) if total > 0 else 0
+    # Stats tracking
+    stats = Counter()
     
-    print(f"Success: {success}/{total} ({success_rate:.1f}%)")
-    print(f"Failures: {failures}")
+    # Semaphore for concurrency control
+    semaphore = asyncio.Semaphore(concurrency)
     
-    if success > 0:
-        print(f"\nTiming Statistics:")
-        print(f"  Average: {statistics.mean(times):.2f} ms")
-        print(f"  Minimum: {min(times):.2f} ms")
-        print(f"  Maximum: {max(times):.2f} ms")
-        if len(times) > 1:
-            print(f"  Std Dev: {statistics.stdev(times):.2f} ms")
-            print(f"  Median:  {statistics.median(times):.2f} ms")
-    else:
-        print("\nNo successful queries to calculate statistics.")
+    async def throttled_query():
+        async with semaphore:
+            await query_dns(resolver, domain, stats)
+    
+    # Create tasks
+    tasks = [throttled_query() for _ in range(total_queries)]
+    
+    # Execute with progress bar
+    start_time = time.perf_counter()
+    await tqdm_asyncio.gather(*tasks, desc="Queries", unit="req")
+    elapsed = time.perf_counter() - start_time
+    
+    # Results
+    total = sum(stats.values())
+    qps = total / elapsed if elapsed > 0 else 0
+    
+    print(f"\n{'=' * 50}")
+    print(f"RESULTS")
+    print(f"{'=' * 50}")
+    print(f"Duration:    {elapsed:.2f}s")
+    print(f"Total:       {total:,} queries")
+    print(f"Success:     {stats['success']:,} ({stats['success']/total*100:.1f}%)")
+    print(f"Timeouts:    {stats['timeout']:,}")
+    print(f"NXDomain:    {stats['nxdomain']:,}")
+    print(f"No Answer:   {stats['no_answer']:,}")
+    print(f"Errors:      {stats['error']:,}")
+    print(f"\n{'=' * 50}")
+    print(f"THROUGHPUT:  {qps:,.0f} queries/second")
+    print(f"{'=' * 50}")
 
 
 if __name__ == "__main__":
-    # Default test configuration
-    dns_performance_test(
+    asyncio.run(run_load_test(
         host="127.0.0.1",
         port=6073,
         domain="google.com",
-        queries=10
-    )
+        total_queries=100000,
+        concurrency=5000,
+    ))

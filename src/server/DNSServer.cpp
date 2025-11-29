@@ -5,11 +5,10 @@
 #include "DNSServer.h"
 #include <exception>
 #include <iostream>
-#include <ws2tcpip.h>
+#include <mutex>
 
-DNSServer::DNSServer(unsigned short port, ICallback& callback) : dns_port(port) {
+DNSServer::DNSServer(unsigned short port) : dns_port(port) {
 	this->start(dns_port);
-	this->listen(callback);
 }
 
 bool DNSServer::start(unsigned short port) {
@@ -47,32 +46,38 @@ bool DNSServer::start(unsigned short port) {
 	}
 }
 
-void DNSServer::listen(ICallback& callback) const {
-	if (runsock_) {
-		std::cout << DNSServer::art << " on -> port : " << this->dns_port << std::endl;
-		sockaddr_in from_addr;
-		int from_addr_len = sizeof(from_addr);
+void DNSServer::listen(ICallback& callback) {
+	if (!runsock_) throw std::system_error(213, std::generic_category(), "DNS Server Is Not Initialized");
 
-		char buffer[512]; // RFC 1035
+	this->listen_ = true;
+	std::cout << DNSServer::art << " on -> port : " << this->dns_port << std::endl;
+	sockaddr_in from_addr;
+	int from_addr_len = sizeof(from_addr);
 
-		while (runsock_) {
-			int recvLen = recvfrom(socket_, buffer, 512, 0, (SOCKADDR*)&from_addr, &from_addr_len);
-			if (recvLen) callback.onReceive(buffer, recvLen, from_addr);
+	char buffer[4096]; // RFC 1035 is 512, but I dont wanna drop packets.
+
+	while (runsock_) {
+		int recvLen = recvfrom(socket_, buffer, 4096, 0, (SOCKADDR*)&from_addr, &from_addr_len);
+		if (recvLen > 0) callback.onReceive(buffer, recvLen, from_addr);
+	}
+}
+
+void DNSServer::send(sockaddr_in& to_addr, const char* resp, int resp_len) {
+	// sendto is thread-safe for UDP.
+	int ret = sendto(this->socket_, resp, resp_len, 0, (SOCKADDR*)&to_addr, sizeof(to_addr));
+
+	if (ret < 0) {
+		// NO THROW.
+		// UDP is unreliable by design. If a packet drops, the client will retry.
+		// Just log the error and move on.
+
+		int err = WSAGetLastError();
+		if (err != WSAEWOULDBLOCK && err != WSAEINTR) {
+			//need 2 log
 		}
 	}
-	else throw std::system_error(213, std::generic_category(), std::string("DNS Server Is Not Initialized"));
 }
 
-void DNSServer::send() {
-	//sockaddr_in add;
-	//add.sin_family = AF_INET;
-	//add.sin_addr.s_addr = inet_addr(address.c_str());
-	//add.sin_port = htons(port);
-	//int ret = sendto(sock, buffer, len, 0, (SOCKADDR*)&add, sizeof(add));
-	//if (ret < 0)
-	//	throw std::system_error(WSAGetLastError(), std::system_category(), "sendto failed");
-
-}
 
 //init windows socket api/wsa 
 bool DNSServer::start_internal() {
@@ -88,7 +93,8 @@ bool DNSServer::start_internal() {
 bool DNSServer::stop() {
 	try {
 		if (socket_ != INVALID_SOCKET) closesocket(socket_);
-		runsock_ = false;
+		this->listen_ = false;
+		this->runsock_ = false;
 		WSACleanup();
 		return true;
 	}

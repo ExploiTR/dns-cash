@@ -12,9 +12,14 @@ endif()
 project ("dns-cash")
 
 # Add source to this project's executable.
-add_executable (dns-cash "dns-cash.cpp" "dns-cash.h" "src/server/DNSServer.cpp" "src/server/DNSServer.h" "src/callback/DNSRequestCallback.h" "src/callback/ICallback.h"  "src/executors/ThreadPool.h" "src/executors/ThreadPool.cpp")
+add_executable (dns-cash "dns-cash.cpp" "dns-cash.h" "src/server/DNSServer.cpp" "src/server/DNSServer.h" "src/callback/DNSRequestCallback.h" "src/callback/ICallback.h"  "src/executors/ThreadPool.h" "src/executors/ThreadPool.cpp" "src/processor/dns_parser.h" "src/processor/dns_parser.cpp" "src/processor/dns_processor.h" "src/processor/dns_processor.cpp" "src/utils/tlru_cache.h" "src/utils/tlru_cache.cpp" "src/utils/cmdl_honly.h")
 target_include_directories(dns-cash PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/src)
 target_link_libraries(dns-cash PRIVATE ws2_32)
+
+# Increase MSVC stack size to 16 MB
+if (MSVC)
+    target_link_options(dns-cash PRIVATE "/STACK:16777216")
+endif()
 
 if (CMAKE_VERSION VERSION_GREATER 3.12)
   set_property(TARGET dns-cash PROPERTY CXX_STANDARD 20)
