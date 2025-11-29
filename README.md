@@ -1,6 +1,6 @@
 ## Overview
 
-`dns-cash` is designed to be a high-performance, multi-threaded DNS server. It features a modular architecture separating the server listener, request processor, and execution engine.
+`dns-cash` is designed to be a high-performance, multi-threaded DNS cache server. It features a modular architecture separating the server listener, request processor, and execution engine.
 
 This project is currently under active development. While the core infrastructure (server, threading, caching) is in place, the logic for handling DNS responses and forwarding is incomplete.
 
