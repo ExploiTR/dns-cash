@@ -2,7 +2,9 @@
 
 `dns-cash` is designed to be a high-performance, multi-threaded DNS cache server. It features a modular architecture separating the server listener, request processor, and execution engine.
 
-This project is currently under active development. While the core infrastructure (server, threading, caching) is in place, the logic for handling DNS responses and forwarding is incomplete.
+This project is currently incomplete and under active development. While the core infrastructure (server, threading, caching) is in place, the logic for handling DNS responses and forwarding is incomplete.
+
+**_Also, at this moment, it heavily relies on Windows APIs and is non portable._**
 
 A personal experimental project implementing a DNS server in C++ adhering to [RFC 1035](https://datatracker.ietf.org/doc/html/rfc1035).
 
