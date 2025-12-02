@@ -1,4 +1,5 @@
-## Overview
+[![Windows C++ CI](https://github.com/ExploiTR/dns-cash/actions/workflows/c-cpp.yml/badge.svg?branch=master)](https://github.com/ExploiTR/dns-cash/actions/workflows/c-cpp.yml)
+## Project Overview 
 
 `dns-cash` is designed to be a high-performance, multi-threaded DNS cache server. It features a modular architecture separating the server listener, request processor, and execution engine.
 
