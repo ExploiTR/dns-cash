@@ -217,7 +217,7 @@ bool parse_dnsq_internal_w_cmpr(const char* query, uint_fast16_t& qaddr, char* s
 			sink_buf[bufaddr++] = '.';
 	}
 
-	qaddr++; //move to next start
+	++qaddr; //move to next start
 
 	return true;
 }
