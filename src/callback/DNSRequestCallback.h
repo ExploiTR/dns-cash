@@ -15,6 +15,7 @@ private:
 	dns_cash::TLRUCache& dns_cache;
 
 	sockaddr_in dns_resolver_addr;
+	using clock = std::chrono::steady_clock;
 
 public:
 	DNSRequestCallback(ThreadPool& pool, DNSServer& server_, dns_cash::TLRUCache& cache) : thread_pool(pool), server(server_), dns_cache(cache) {
@@ -29,9 +30,8 @@ public:
 		std::vector<char> packet_data(msg, msg + len);
 
 		this->thread_pool.enqueue_task(
-			[this, msgcp = std::move(packet_data), &len, &sender, dnsreslv = &dns_resolver_addr]
+			[this, msgcp = std::move(packet_data), &len, &sender]
 			{
-				using clock = std::chrono::high_resolution_clock;
 				auto t0 = clock::now();
 
 				///////////// parsing
@@ -43,12 +43,20 @@ public:
 				bool res = parse_dns_query(msgcp.data(), len, header, question);
 				if (!res) return;
 
-				if (auto answer = this->dns_cache.get(question)) {
-					//this->server.send(sender,answer->r);
+				if (header.qr) {
+					//in our case, this is a real dns resolver replying us
 				}
 				else {
-					//we're done here, in case we receive the response in some other thread or cycle.
-					this->server.send(dns_resolver_addr, msgcp.data(), msgcp.size());
+					//this is a client making a query
+
+					if (auto answer = this->dns_cache.get(question)) {
+						//this->server.send_to_client((const char*)answer->rdata, 512);
+					}
+					else {
+						//we're done here, in case we receive the response in some other thread or cycle.
+						this->server.send_to_server(msgcp.data(), msgcp.size());
+						printf("srv rq st\n");
+					}
 				}
 
 				///////////// parsing
@@ -58,10 +66,16 @@ public:
 
 				double qps = 1e9 / duration_ns;
 
+				char ipstr[INET_ADDRSTRLEN];
+
+				inet_ntop(AF_INET, &sender.sin_addr, ipstr, sizeof(ipstr));
+
 				// Correct format for atomic uint64_t
-				printf("%lld ns | %s | %.0f req/s\n",
+				printf("%lld ns | %s | t: %d | s %s | %.0f req/s\n",
 					duration_ns,
 					question.qname,
+					header.qr,
+					ipstr,
 					qps);
 
 				if (!res) return;
