@@ -16,16 +16,16 @@ namespace dns_cash {
 	*/
 	class TLRUCache {
 	private:
-		TLRUCache();
+		TLRUCache() = default;
 
 		uint_fast32_t max_capacity_ = 0;
 
 		//Batch eviction was a bad idea - unused now.
 		uint_fast64_t max_capacity_hard_limit_ = -1;
 
-		// Fixed-point scale (×128) representing 1.2 multiplier for 20% overflow allowance.
+		// Fixed-point scale (ï¿½128) representing 1.2 multiplier for 20% overflow allowance.
 		// Used to allow capacity to grow up to 120% before trimming back to max (prevents rapid oscillation at full load).
-		// premature unnesessary optimizations lol
+		// premature unnecessary optimizations lol
 		//code removed : un-necessary work
 		//uint_fast16_t max_capacity_overflow_ratio_ = (uint_fast16_t)(1.2 * 128);
 
@@ -40,7 +40,7 @@ namespace dns_cash {
 
 	public:
 		TLRUCache(uint_fast32_t max_capacity, bool enable_ttl_eviction);
-		~TLRUCache();
+		~TLRUCache() = default;
 
 		void add(const DNSQuestion& question, const DNSAnswer& answer);
 		void remove(const DNSQuestion& question);

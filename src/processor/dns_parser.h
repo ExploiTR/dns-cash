@@ -146,7 +146,7 @@ struct DNSAnswer {
 *		|      Additional     | RRs holding additional information
 *		+---------------------+
 */
-bool parse_dns_query(const char* query, int qlen, DNSHeader& header, DNSQuestion& question);
+bool parse_dns_query(const char* query, int query_len, DNSHeader& header, DNSQuestion& question);
 
 
 /*

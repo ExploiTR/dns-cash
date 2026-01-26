@@ -1,5 +1,4 @@
 #include "dns_parser.h"
-#include <exception>
 #include <WinSock2.h>
 #include <iostream>
 
@@ -38,8 +37,8 @@
 * Original 1035 : https://datatracker.ietf.org/doc/html/rfc1035
 *
 */
-bool parse_dns_query(const char* query, int qlen, DNSHeader& header, DNSQuestion& question) {
-	if (qlen < 12) {
+bool parse_dns_query(const char* query, const int query_len, DNSHeader& header, DNSQuestion& question) {
+	if (query_len < 12) {
 		std::cerr << "Error: Message too short for DNS header - Silently dropping the request." << std::endl;
 		return false;
 	}
@@ -75,7 +74,7 @@ bool parse_dns_query(const char* query, int qlen, DNSHeader& header, DNSQuestion
 	//header is pretty much straightforward
 	header.id = ntohs((*(uint16_t*)&query[0]));
 
-	uint16_t flags = ntohs(*(uint16_t*)&query[2]);
+	const uint16_t flags = ntohs(*(uint16_t*)&query[2]);
 	header.qr = flags >> 15;
 	header.opcode = flags >> 11 & 0b1111;
 	header.aa = flags >> 10 & 0b1;
@@ -159,13 +158,13 @@ bool parse_dns_query(const char* query, int qlen, DNSHeader& header, DNSQuestion
 
 	buffer[buffer_pos] = '\0';
 
-	if (qaddr + 4 > qlen) return false;  // Need 4 bytes for QTYPE+QCLASS
+	if (qaddr + 4 > query_len) return false;  // Need 4 bytes for QTYPE+QCLASS
 
 	question.qtype = ntohs(*(uint16_t*)&query[qaddr]);
 	qaddr += 2;
 
 	question.qclass = ntohs(*(uint16_t*)&query[qaddr]);
-	qaddr += 2;
+	// qaddr += 2;
 
 	return true;
 }
@@ -189,7 +188,7 @@ bool parse_dnsq_internal_w_cmpr(const char* query, uint_fast16_t& qaddr, char* s
 			//take rest except first 2 in the 16bit
 			uint_fast16_t cmpr_offset = 0b0011111111111111 & ntohs(*(uint16_t*)&query[qaddr]);
 
-			//offset should not excced qaddr
+			//offset should not exceed qaddr
 			if (cmpr_offset >= qaddr) return false;
 
 			//parse compression

@@ -6,25 +6,17 @@ dns_cash::TLRUCache::TLRUCache(uint_fast32_t max_capacity, bool enable_ttl_evict
 	// Apply fixed-point overflow ratio (scaled by 128) to compute hard capacity limit.
 	// Right shift by 7 to rescale after multiplication, so - max_capacity_ * 1.2.
 
-	//I dont think this optimization was necessary at all, although done for fun, I'd not use this in a shared codebase.
+	//I don't think this optimization was necessary at all, although done for fun, I'd not use this in a shared codebase.
 	//code removed : un-necessary work
 	//this->max_capacity_hard_limit_ = ((uint_fast64_t)this->max_capacity_ * this->max_capacity_overflow_ratio_) >> 7;
 }
-
-dns_cash::TLRUCache::~TLRUCache()
-{
-	// just fr structure
-}
-
 
 void dns_cash::TLRUCache::add(const DNSQuestion& question, const DNSAnswer& answer)
 {
 	//auto unlocked
 	std::unique_lock<std::shared_mutex> cache_update_lock(this->cache_map_mutex);
 
-	auto cache_entry = this->query_cache_map.find(question);
-
-	if (cache_entry != this->query_cache_map.end()) {
+	if (const auto cache_entry = this->query_cache_map.find(question); cache_entry != this->query_cache_map.end()) {
 		cache_entry->second.first = answer;
 
 		// Move its list entry to the back, no copy
@@ -71,9 +63,7 @@ void dns_cash::TLRUCache::remove(const DNSQuestion& question)
 	//auto unlocked
 	std::unique_lock<std::shared_mutex> cache_update_lock(this->cache_map_mutex);
 
-	auto cache_entry = this->query_cache_map.find(question);
-
-	if (cache_entry != this->query_cache_map.end()) {
+	if (auto cache_entry = this->query_cache_map.find(question); cache_entry != this->query_cache_map.end()) {
 		this->query_frequency_list.erase(cache_entry->second.second);
 		this->query_cache_map.erase(cache_entry);
 	}
@@ -100,13 +90,13 @@ std::optional<DNSAnswer> dns_cash::TLRUCache::get(const DNSQuestion& question)
 	//auto unlocked -  shared read lock
 	std::shared_lock<std::shared_mutex> cache_read_lock(this->cache_map_mutex);
 
-	auto cache_entry = this->query_cache_map.find(question);
+	const auto cache_entry = this->query_cache_map.find(question);
 
-	//check existance
+	//check existence
 	if (cache_entry == this->query_cache_map.end()) return std::nullopt;
 
 	//check ttl enabled and expired
-	//here to maintain high thruput read, no removal of the entry will be pushed out eventually
+	//here to maintain high throughput read, no removal of the entry will be pushed out eventually
 	if (this->enable_ttl_eviction_ && cache_entry->second.first.expiry <= std::chrono::steady_clock::now().time_since_epoch().count())
 		return std::nullopt;
 

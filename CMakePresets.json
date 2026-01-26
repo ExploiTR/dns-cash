@@ -11,7 +11,7 @@
         "CMAKE_C_COMPILER": "cl.exe",
         "CMAKE_CXX_COMPILER": "cl.exe",
         "CMAKE_TOOLCHAIN_FILE": {
-          "value": "C:/Users/Pratim/vcpkg/scripts/buildsystems/vcpkg.cmake",
+          "value": "$env{VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake",
           "type": "FILEPATH"
         }
       },
@@ -22,7 +22,7 @@
       }
     },
     {
-      "name": "x64-debug",
+      "name": "x64-debug-custom",
       "displayName": "x64 Debug",
       "inherits": "windows-base",
       "architecture": {
@@ -36,7 +36,7 @@
     {
       "name": "x64-release",
       "displayName": "x64 Release",
-      "inherits": "x64-debug",
+      "inherits": "x64-debug-custom",
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "Release"
       }
