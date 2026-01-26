@@ -107,7 +107,7 @@ struct DNSQuestion {
 @remarks
 --> We don't necessarily need 'name', 'type', 'class' here if they are already in the Key.
 */
-
+//do we even need to parse as a cache?
 struct DNSAnswer {
 	uint64_t expiry; // need to read ttl then add to UTC (steady clock)
 	uint16_t rdlen;
@@ -146,7 +146,7 @@ struct DNSAnswer {
 *		|      Additional     | RRs holding additional information
 *		+---------------------+
 */
-bool parse_dns_query(const char* query, int query_len, DNSHeader& header, DNSQuestion& question);
+uint_fast16_t parse_dns_query(const char* query, int query_len, DNSHeader& header, DNSQuestion& question);
 
 
 /*
@@ -184,23 +184,22 @@ bool parse_dnsq_internal_w_cmpr(const char* query, uint_fast16_t& start_qry_idx,
 
 	'std::hash<DNSQuestion>::hash(void)': attempting to reference a deleted function
 */
-namespace std {
-	template<>
-	struct hash<DNSQuestion> {
-		size_t operator()(const DNSQuestion& question) const {
-			size_t seed = 0;
+template<>
+struct std::hash<DNSQuestion> {
+	size_t operator()(const DNSQuestion& question) const noexcept
+	{
+		size_t seed = 0;
 
-			auto hash_combine = [](size_t& seed, const size_t& value)
-				{
-					// 0x9e3779b97f4a7c15 -> 2^64 divided by golden ratio 1.618
-					seed ^= value + 0x9e3779b97f4a7c15 + (seed << 6) + (seed >> 2);
-				};
+		auto hash_combine = [](size_t& seed, const size_t& value)
+		{
+			// 0x9e3779b97f4a7c15 -> 2^64 divided by golden ratio 1.618
+			seed ^= value + 0x9e3779b97f4a7c15 + (seed << 6) + (seed >> 2);
+		};
 
-			hash_combine(seed, hash<string>()(question.qname));
-			hash_combine(seed, hash<uint16_t>()(question.qtype));
-			hash_combine(seed, hash<uint16_t>()(question.qclass));
+		hash_combine(seed, hash<string>()(question.qname));
+		hash_combine(seed, hash<uint16_t>()(question.qtype));
+		hash_combine(seed, hash<uint16_t>()(question.qclass));
 
-			return seed;
-		}
-	};
-}
+		return seed;
+	}
+};

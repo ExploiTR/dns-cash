@@ -5,6 +5,14 @@
 #include <processor/dns_parser.h>
 #include <optional>
 
+
+/*
+ * TODO Rework :
+ *
+ * Instead of time based, we'd do random
+ * sampling eviction
+ *
+ */
 namespace dns_cash {
 
 	using ListIt = std::list<DNSQuestion>::iterator;
@@ -23,7 +31,7 @@ namespace dns_cash {
 		//Batch eviction was a bad idea - unused now.
 		uint_fast64_t max_capacity_hard_limit_ = -1;
 
-		// Fixed-point scale (�128) representing 1.2 multiplier for 20% overflow allowance.
+		// Fixed-point scale (128) representing 1.2 multiplier for 20% overflow allowance.
 		// Used to allow capacity to grow up to 120% before trimming back to max (prevents rapid oscillation at full load).
 		// premature unnecessary optimizations lol
 		//code removed : un-necessary work

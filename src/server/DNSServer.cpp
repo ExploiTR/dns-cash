@@ -50,8 +50,8 @@ bool DNSServer::start(unsigned short port)
             return false;
         }
 
-        runsock_ = true;
-        return runsock_;
+        run_socket = true;
+        return run_socket;
     }
     catch (std::exception& e)
     {
@@ -62,7 +62,7 @@ bool DNSServer::start(unsigned short port)
 
 void DNSServer::listen(ICallback& callback)
 {
-    if (!this->runsock_) throw std::system_error(213, std::generic_category(), "DNS Server Is Not Initialized");
+    if (!this->run_socket) throw std::system_error(213, std::generic_category(), "DNS Server Is Not Initialized");
 
     this->listen_ = true;
     std::cout << DNSServer::art << " on -> port : " << this->dns_port << std::endl;
@@ -71,17 +71,18 @@ void DNSServer::listen(ICallback& callback)
 
     char buffer[4096]; // RFC 1035 is 512, but I don't want to drop packets.
 
-    while (this->runsock_)
+    while (this->run_socket)
     {
         if (const int recvLen = recvfrom(socket_, buffer, 4096, 0, reinterpret_cast<SOCKADDR*>(&from_addr), &from_addr_len); recvLen > 0)
             callback.onReceive(buffer, recvLen, from_addr);
+        if (!this->run_socket) break;
     }
 }
 
-void DNSServer::send_to_server(const char* resp, int resp_len)
+void DNSServer::send_to_server(const char* resp, const int resp_len)
 {
     // sendto is thread-safe for UDP.
-    int ret = sendto(this->socket_, resp, resp_len, 0, reinterpret_cast<SOCKADDR*>(&this->sock_remote_addr),
+    const int ret = sendto(this->socket_, resp, resp_len, 0, reinterpret_cast<SOCKADDR*>(&this->sock_remote_addr),
                      sizeof(this->sock_remote_addr));
 
     if (ret < 0)
@@ -101,12 +102,11 @@ void DNSServer::send_to_server(const char* resp, int resp_len)
 
 void DNSServer::send_to_client(const sockaddr_in& client_addr, const char* resp, const int resp_len)
 {
-    SOCKET client_sock = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
+    const SOCKET client_sock = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
 
     // sendto is thread-safe for UDP.
-    int ret = sendto(client_sock, resp, resp_len, 0, (SOCKADDR*)&client_addr, sizeof(client_addr));
 
-    if (ret < 0)
+    if (const int ret = sendto(client_sock, resp, resp_len, 0, (SOCKADDR*)&client_addr, sizeof(client_addr)); ret < 0)
     {
         // UDP can drop. If a packet drops, the client will retry.
         // Need to log the error and move on.
@@ -139,7 +139,7 @@ bool DNSServer::stop()
     {
         if (socket_ != INVALID_SOCKET) closesocket(socket_);
         this->listen_ = false;
-        this->runsock_ = false;
+        this->run_socket = false;
         WSACleanup();
         return true;
     }

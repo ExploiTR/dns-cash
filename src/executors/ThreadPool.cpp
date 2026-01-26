@@ -73,7 +73,7 @@ std::thread ThreadPool::get_worker_thread() {
 			//loop until asked to stop
 			while (!this->stop_code) {
 				//lock guard cant auto unlock so we need a RAII lock that supports manual unlock/relock
-				std::unique_lock<std::mutex> lock(this->qutex);
+				std::unique_lock lock(this->qutex);
 
 				//this thread will now wait until tasks are available or stop code is triggered.
 				//Atomic: unlock, sleep, reacquire lock, check predicate. Prevents false wakeups.
