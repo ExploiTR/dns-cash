@@ -1,5 +1,4 @@
 #include "dns_parser.h"
-#include <exception>
 #include <WinSock2.h>
 #include <iostream>
 
@@ -38,8 +37,8 @@
 * Original 1035 : https://datatracker.ietf.org/doc/html/rfc1035
 *
 */
-bool parse_dns_query(const char* query, int qlen, DNSHeader& header, DNSQuestion& question) {
-	if (qlen < 12) {
+uint_fast16_t parse_dns_query(const char* query, const int query_len, DNSHeader& header, DNSQuestion& question) {
+	if (query_len < 12) {
 		std::cerr << "Error: Message too short for DNS header - Silently dropping the request." << std::endl;
 		return false;
 	}
@@ -70,12 +69,12 @@ bool parse_dns_query(const char* query, int qlen, DNSHeader& header, DNSQuestion
 	* Bytes 10-11: ARCOUNT (16 bits)
 	*/
 
-	//read 16bit(2 bytes) starting from query[0]'s address then 
+	//read 16bit(2 bytes) starting from query[0]'s address then
 	//dereference to get the value and use ntohs to convert network to host order.
 	//header is pretty much straightforward
 	header.id = ntohs((*(uint16_t*)&query[0]));
 
-	uint16_t flags = ntohs(*(uint16_t*)&query[2]);
+	const uint16_t flags = ntohs(*(uint16_t*)&query[2]);
 	header.qr = flags >> 15;
 	header.opcode = flags >> 11 & 0b1111;
 	header.aa = flags >> 10 & 0b1;
@@ -159,7 +158,7 @@ bool parse_dns_query(const char* query, int qlen, DNSHeader& header, DNSQuestion
 
 	buffer[buffer_pos] = '\0';
 
-	if (qaddr + 4 > qlen) return false;  // Need 4 bytes for QTYPE+QCLASS
+	if (qaddr + 4 > query_len) return false;  // Need 4 bytes for QTYPE+QCLASS
 
 	question.qtype = ntohs(*(uint16_t*)&query[qaddr]);
 	qaddr += 2;
@@ -167,7 +166,7 @@ bool parse_dns_query(const char* query, int qlen, DNSHeader& header, DNSQuestion
 	question.qclass = ntohs(*(uint16_t*)&query[qaddr]);
 	qaddr += 2;
 
-	return true;
+	return qaddr;
 }
 
 bool parse_dnsq_internal_w_cmpr(const char* query, uint_fast16_t& qaddr, char* sink_buf, uint_fast16_t& bufaddr, uint_fast8_t jump_count)
@@ -177,24 +176,24 @@ bool parse_dnsq_internal_w_cmpr(const char* query, uint_fast16_t& qaddr, char* s
 
 	while (*(uint8_t*)&query[qaddr] != 0) {
 		//read length from the first byte at the index
-		uint8_t len = *(uint8_t*)&query[qaddr];
+		const uint8_t len = *(uint8_t*)&query[qaddr];
 
 		// Validate label length (max 63 per 4.1.4. Message compression - RFC 1035)
 		if (len > 63 || bufaddr + len + 1 >= 255)
 			return false;
 
-		// message compression handling - 4.1.4 
+		// message compression handling - 4.1.4
 		// compression pointer check first 2 as 1
 		if ((len & 0b11000000) == 0b11000000) {
 			//take rest except first 2 in the 16bit
 			uint_fast16_t cmpr_offset = 0b0011111111111111 & ntohs(*(uint16_t*)&query[qaddr]);
 
-			//offset should not excced qaddr
+			//offset should not exceed qaddr
 			if (cmpr_offset >= qaddr) return false;
 
 			//parse compression
-			bool res = parse_dnsq_internal_w_cmpr(query, cmpr_offset, sink_buf, bufaddr, jump_count + 1);
-			if (!res) return false;
+			if (const bool res = parse_dnsq_internal_w_cmpr(query, cmpr_offset, sink_buf, bufaddr, jump_count + 1); !res)
+				return false;
 
 			//skip to the next line (next to next byte)
 			qaddr += 2;

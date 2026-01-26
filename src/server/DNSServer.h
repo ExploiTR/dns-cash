@@ -25,7 +25,7 @@ Running ~)";
 
 	SOCKET socket_ = INVALID_SOCKET;
 
-	bool runsock_ = false;
+	std::atomic<bool> run_socket = false;
 	bool listen_ = false;
 
 	const PCSTR remote_dns_address = "8.8.8.8";
@@ -33,17 +33,17 @@ Running ~)";
 
 	std::mutex send_mutex;
 
-	DNSServer();
-	bool start_internal();
+	static bool start_internal();
 	bool start(unsigned short port = 53);
 
 public:
-	DNSServer(unsigned short port);
+	DNSServer() = delete;
+	explicit DNSServer(unsigned short port);
 	~DNSServer() { stop(); }
 
 	void send_to_server(const char* resp, int resp_len);
-	void send_to_client(const sockaddr_in& client_addr, const char* resp, int resp_len);
+	static void send_to_client(const sockaddr_in& client_addr, const char* resp, int resp_len);
 	void listen(ICallback& callback);
 	bool stop();
-	unsigned short get_port() { return dns_port; };
+	unsigned short get_port() const { return dns_port; };
 };

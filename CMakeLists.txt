@@ -31,26 +31,7 @@ add_executable(dns-cash
 )
 target_include_directories(dns-cash PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/src)
 
-# Link jemalloc using pkg-config - fix for CI dont include jemalloc
-find_package(PkgConfig QUIET)
-
-if(PkgConfig_FOUND)
-    pkg_search_module(JEMALLOC QUIET jemalloc)
-endif()
-
-if(JEMALLOC_FOUND)
-    message(STATUS "jemalloc found via pkg-config")
-
-    target_include_directories(dns-cash PRIVATE ${JEMALLOC_INCLUDE_DIRS})
-    target_link_directories(dns-cash PRIVATE ${JEMALLOC_LIBRARY_DIRS})
-    target_link_libraries(dns-cash PRIVATE ${JEMALLOC_LIBRARIES})
-else()
-    message(STATUS "jemalloc not found; building without it")
-endif()
-
 target_link_libraries(dns-cash PRIVATE ws2_32)
-
-
 
 # Increase MSVC stack size to 16 MB
 if (MSVC)
