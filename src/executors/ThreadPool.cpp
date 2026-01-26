@@ -5,8 +5,8 @@
 //define
 unsigned int ThreadPool::core_count;
 
-//initalize our pool and set stop code to false
-ThreadPool::ThreadPool(unsigned int thread_count, bool enable_pinning) :
+//initialize our pool and set stop code to false
+ThreadPool::ThreadPool(const unsigned int thread_count, const bool enable_pinning) :
 	stop_code(false),
 	active_thread_count(thread_count),
 	enable_affinity(enable_pinning) {
@@ -17,7 +17,7 @@ ThreadPool::ThreadPool(unsigned int thread_count, bool enable_pinning) :
 	this->initialize_workers(this->active_thread_count);
 }
 
-unsigned int ThreadPool::get_optimal_thread_count(unsigned int logical_threads_per_core) {
+unsigned int ThreadPool::get_optimal_thread_count(const unsigned int logical_threads_per_core) {
 	const auto& hardware_core_ = std::thread::hardware_concurrency();
 
 	if (logical_threads_per_core < 1) throw std::exception("Invalid LTPC value!");
@@ -33,7 +33,7 @@ unsigned int ThreadPool::get_optimal_thread_count(unsigned int logical_threads_p
 	return (hardware_core_ * ThreadPool::thread_multiplier) / logical_threads_per_core;
 }
 
-void ThreadPool::initialize_workers(unsigned int thread_count) {
+void ThreadPool::initialize_workers(const unsigned int thread_count) {
 	if (thread_count < 1) throw std::exception("Invalid thread count!");
 	std::cout << "Initializing with worker count - " << thread_count << "\n";
 	std::cout << "CPU Core Pinning - " << (this->enable_affinity ? "Enabled" : "Disabled") << "\n";
@@ -46,13 +46,12 @@ void ThreadPool::initialize_workers(unsigned int thread_count) {
 			HANDLE hThread = c_thread.native_handle();
 
 			//core mask
-			int core_mask = core_index % this->core_count;  // 43 % 6 = 1
+			const unsigned int core_mask = core_index % ThreadPool::core_count;  // 43 % 6 = 1
 			DWORD_PTR affinity_mask = (1ULL << core_mask);
 
 			// Set the thread affinity mask
-			DWORD_PTR oldMask = SetThreadAffinityMask(hThread, affinity_mask);
 
-			if (oldMask == 0) {
+			if (DWORD_PTR oldMask = SetThreadAffinityMask(hThread, affinity_mask); oldMask == 0) {
 				std::cerr << "Failed to set thread affinity. Error: " << GetLastError() << " \n Disable pinning if required." << std::endl;
 				return;
 			}
@@ -106,7 +105,7 @@ std::thread ThreadPool::get_worker_thread() {
 void ThreadPool::enqueue_task(const std::function<void()>& task) {
 	{
 		//obtain lock update queue and notify any single thread.
-		std::unique_lock<std::mutex> lock(qutex);
+		std::unique_lock lock(qutex);
 		tasks.push(task);
 	}
 	cvar.notify_one();
@@ -114,12 +113,12 @@ void ThreadPool::enqueue_task(const std::function<void()>& task) {
 
 void ThreadPool::stop_workers() {
 	{
-		//we dont want the threads to lock the queue again when they wake up
-		std::unique_lock<std::mutex> lock(qutex);
+		//we don't want the threads to lock the queue again when they wake up
+		std::unique_lock lock(qutex);
 		stop_code = true;
 	}
 
-	//thats one thundering herd
+	//that's one thundering herd
 	cvar.notify_all();
 
 	for (auto& worker : workers)
